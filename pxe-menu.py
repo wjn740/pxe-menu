@@ -3,13 +3,19 @@
 import os
 import shutil
 
-rootDir = "../mounts/install/SLP"
+rootDir = "/srv/tftpboot/mounts/install/SLP"
 
+basepath = "/mounts/dist/install/SLP/"
 initrd = "x86_64/DVD1/boot/x86_64/loader/initrd"
 kernel = "x86_64/DVD1/boot/x86_64/loader/linux"
+
+install_server = "mirror.suse.asia"
+
+
 pxemainmenufilename="james-default"
 pxelinux_root = "james-pxelinux.cfg/"
 confdir = os.path.join(pxelinux_root,"confdir")
+
 
 
 pxemenu_title = """DEFAULT menu.c32
@@ -36,7 +42,18 @@ pxereturnbutton = """LABEL MAIN MENU
  APPEND pxelinux.cfg/james-default
 """
 
+pxeloadmenu_title = """PROMPT 0
+DEFAULT menu.c32
+TIMEOUT 0
+"""
                 
+pxeloadmenu_methods = ["ssh", "vnc", "ctxt", "ltxt", "x11"]
+
+pxeloadmenu_return = """LABEL MAIN MENU
+ MENU LABEL ^Return to previous Menu
+ KERNEL menu.c32
+ APPEND pxelinux.cfg/confdir/"""
+
 
 products = []
 
@@ -112,6 +129,45 @@ for p in products:
                 fd2.write("\n")
                 j+=1
                 os.fsync(fd2)
+                
+                k=1
+                fd3 = open(os.path.join(confdir,pxeloadmenufilename), "w+")
+                fd3.write(pxeloadmenu_title)
+                for method in pxeloadmenu_methods:
+                        fd3.write("MENU TITLE " + p + " + " + type)
+                        fd3.write("\n")
+#LABEL line
+                        fd3.write("LABEL ")
+                        fd3.write(p+"-"+type+"-"+method)
+                        fd3.write("\n")
+#MENU line
+                        fd3.write(" MENU LABEL ^")
+                        fd3.write(str(k))
+                        fd3.write(" ")
+                        fd3.write(method)
+                        fd3.write("\n")
+#KERNEL line
+                        fd3.write(" KERNEL ")
+                        fd3.write(os.path.join(basepath, p, kernel))
+                        fd3.write("\n")
+#APPEND line
+                        fd3.write(" APPEND ")
+                        fd3.write(os.path.join(basepath, p, initrd))
+                        fd3.write(" install="+type+"://"+install_server+"/"+p+"x86_64/DVD1/")
+                        if method == "ssh":
+                               fd3.write("ssh=1 sshpassword=susetesting console=tty console=ttyS1,115200") 
+                        if method == "vnc":
+                               fd3.write("vnc=1 vncpassword=susetesting ssh=1 sshpassword=susetesting console=tty console=ttyS1,115200")
+                        if method == "ctxt":
+                               fd3.write("textmode=1 console=tty console=ttyS1,115200")
+                        if method == "ltxt":
+                               fd3.write("textmode=1")
+                        fd3.write("\n")
+#BLANK LINE
+                        fd3.write("\n")
+                        j+=1
+                        os.fsync(fd3)
+                fd3.write(pxeloadmenu_return+p+"-ix64-115200.conf") 
         fd2.write(pxereturnbutton)
         os.fsync(fd2)
         fd2.close()
